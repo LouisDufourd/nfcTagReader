@@ -33,6 +33,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        //new android stuff
         setContent {
             NfcReaderTheme {
                 // A surface container using the 'background' color from the theme
@@ -53,6 +54,7 @@ class MainActivity : ComponentActivity() {
             return
         }
 
+        //start waiting to an nfc tag
         pendingIntent = PendingIntent.getActivity(
             this, 0,
             Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
@@ -76,6 +78,7 @@ class MainActivity : ComponentActivity() {
     }
 
     override fun onNewIntent(intent: Intent?) {
+        //code run when you place the nfc tag
         if (intent != null) {
             tag = getTag(intent)
             if(tag != "") {
@@ -87,14 +90,17 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun getTag(intent: Intent): String {
+        //we read the tag here
         val tag:Tag? = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
         if(tag == null) {
             Toast.makeText(this, "couldn't read the nfc", Toast.LENGTH_SHORT).show()
             return ""
         }
+        //I transform the tag id from a ByteArray to a String
         return String(tag.id)
     }
 
+    //new android stuff
     @Composable
     fun Greeting(name: String, modifier: Modifier = Modifier) {
         Text(
