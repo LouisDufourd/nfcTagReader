@@ -1,21 +1,14 @@
 package fr.plaglefleau.nfcreader
 
-import android.R.attr.tag
 import android.app.PendingIntent
 import android.content.Intent
 import android.content.IntentFilter
-import android.nfc.NdefMessage
 import android.nfc.NfcAdapter
 import android.nfc.Tag
-import android.nfc.tech.Ndef
+import android.os.Build
 import android.os.Bundle
-import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
-import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -25,79 +18,15 @@ import fr.plaglefleau.nfcreader.ui.theme.NfcReaderTheme
 
 class MainActivity : ComponentActivity() {
 
-    private var nfcAdapter: NfcAdapter? = null
-    private var pendingIntent: PendingIntent? = null
     private var tag:String = ""
-    private val intentFiltersArray: Array<IntentFilter>? = null
-    private val techListsArray: Array<Array<String>>? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        //new android stuff
-        setContent {
-            NfcReaderTheme {
-                // A surface container using the 'background' color from the theme
-                Surface(
-                    modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colorScheme.background
-                ) {
-                    Greeting("Android")
-                }
-            }
+        if(NfcAdapter.getDefaultAdapter(this) == null) {
+            Toast.makeText(this, "No NFC", Toast.LENGTH_SHORT).show()
+            finish()
         }
 
-        nfcAdapter = NfcAdapter.getDefaultAdapter(this)
-
-        // Check if NFC is available on the device
-        if (nfcAdapter == null) {
-            Toast.makeText(this, "NFC is not supported on this device", Toast.LENGTH_SHORT).show()
-            return
-        }
-
-        //start waiting to an nfc tag
-        pendingIntent = PendingIntent.getActivity(
-            this, 0,
-            Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
-            PendingIntent.FLAG_IMMUTABLE
-        )
-
-    }
-
-    override fun onResume() {
-        super.onResume()
-        //enabling the nfc when the app resume
-        nfcAdapter?.enableForegroundDispatch(this, pendingIntent, intentFiltersArray, techListsArray)
-    }
-
-    override fun onPause() {
-        super.onPause()
-        //disabling the nfc when the app is in pause and if the phone has the nfc
-        if(nfcAdapter != null) {
-            nfcAdapter?.disableForegroundDispatch(this)
-        }
-    }
-
-    override fun onNewIntent(intent: Intent?) {
-        //code run when you place the nfc tag
-        if (intent != null) {
-            tag = getTag(intent)
-            if(tag != "") {
-                Toast.makeText(this, tag, Toast.LENGTH_LONG).show()
-                Log.d("nfcReaderTag", tag)
-            }
-        }
-        super.onNewIntent(intent)
-    }
-
-    private fun getTag(intent: Intent): String {
-        //we read the tag here
-        val tag:Tag? = intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
-        if(tag == null) {
-            Toast.makeText(this, "couldn't read the nfc", Toast.LENGTH_SHORT).show()
-            return ""
-        }
-        //I transform the tag id from a ByteArray to a String
-        return String(tag.id)
     }
 
     //new android stuff
@@ -115,5 +44,56 @@ class MainActivity : ComponentActivity() {
         NfcReaderTheme {
             Greeting("Android")
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        val nfcAdapter = NfcAdapter.getDefaultAdapter(this)
+        val pendingIntent = PendingIntent.getActivity(
+            this, 0, Intent(this, javaClass).addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP),
+            PendingIntent.FLAG_MUTABLE
+        )
+        val intentFilters = arrayOf<IntentFilter>(
+            IntentFilter(NfcAdapter.ACTION_NDEF_DISCOVERED),
+            IntentFilter(NfcAdapter.ACTION_TAG_DISCOVERED),
+            IntentFilter(NfcAdapter.ACTION_TECH_DISCOVERED)
+        )
+        nfcAdapter.enableForegroundDispatch(this, pendingIntent, intentFilters, null)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        val nfcAdapter = NfcAdapter.getDefaultAdapter(this)
+        nfcAdapter.disableForegroundDispatch(this)
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        if (intent?.action == NfcAdapter.ACTION_TAG_DISCOVERED) {
+            val tag = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                intent.getParcelableExtra(NfcAdapter.EXTRA_TAG, Tag::class.java)
+            } else {
+                intent.getParcelableExtra(NfcAdapter.EXTRA_TAG)
+            }
+            tag?.id?.let {
+                val tagValue = it.toHexString()
+                Toast.makeText(this, "NFC tag detected: $tagValue", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    private fun ByteArray.toHexString(): String {
+        val hexChars = "0123456789ABCDEF"
+        val result = StringBuilder(size * 2)
+
+        map { byte ->
+            val value = byte.toInt()
+            val hexChar1 = hexChars[value shr 4 and 0x0F]
+            val hexChar2 = hexChars[value and 0x0F]
+            result.append(hexChar1)
+            result.append(hexChar2)
+        }
+
+        return result.toString()
     }
 }
